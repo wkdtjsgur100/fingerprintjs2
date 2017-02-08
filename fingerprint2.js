@@ -1,5 +1,5 @@
 /*
-* Fingerprintjs2 1.4.1 - Modern & flexible browser fingerprint library v2
+* Fingerprintjs2 1.5.0 - Modern & flexible browser fingerprint library v2
 * https://github.com/Valve/fingerprintjs2
 * Copyright (c) 2015 Valentin Vasilyev (valentin.vasilyev@outlook.com)
 * Licensed under the MIT (http://www.opensource.org/licenses/mit-license.php) license.
@@ -18,8 +18,9 @@
 
 (function (name, context, definition) {
   "use strict";
-  if (typeof module !== "undefined" && module.exports) { module.exports = definition(); }
-  else if (typeof define === "function" && define.amd) { define(definition); }
+  if (typeof define === "function" && define.amd) { define(definition); }
+  else if (typeof module !== "undefined" && module.exports) { module.exports = definition(); }
+  else if (context.exports) { context.exports = definition(); }
   else { context[name] = definition(); }
 })("Fingerprint2", this, function() {
   "use strict";
@@ -54,6 +55,11 @@
     };
   }
   var Fingerprint2 = function(options) {
+
+    if (!(this instanceof Fingerprint2)) {
+      return new Fingerprint2(options);
+    }
+
     var defaultOptions = {
       swfContainerId: "fingerprintjs2",
       swfPath: "flash/compiled/FontList.swf",
@@ -86,6 +92,7 @@
       keys = this.languageKey(keys);
       keys = this.colorDepthKey(keys);
       keys = this.pixelRatioKey(keys);
+      keys = this.hardwareConcurrencyKey(keys);
       keys = this.screenResolutionKey(keys);
       keys = this.availableScreenResolutionKey(keys);
       keys = this.timezoneOffsetKey(keys);
@@ -139,7 +146,7 @@
     },
     colorDepthKey: function(keys) {
       if(!this.options.excludeColorDepth) {
-        keys.push({key: "color_depth", value: screen.colorDepth});
+        keys.push({key: "color_depth", value: screen.colorDepth || -1});
       }
       return keys;
     },
@@ -427,6 +434,7 @@
             s.style.position = "absolute";
             s.style.left = "-9999px";
             s.style.fontSize = testSize;
+            s.style.lineHeight = "normal";
             s.innerHTML = testString;
             return s;
         };
@@ -603,6 +611,12 @@
       }
       return keys;
     },
+    hardwareConcurrencyKey: function(keys){
+      if(!this.options.excludeHardwareConcurrency){
+        keys.push({key: "hardware_concurrency", value: this.getHardwareConcurrency()});
+      }
+      return keys;
+    },
     hasSessionStorage: function () {
       try {
         return !!window.sessionStorage;
@@ -619,7 +633,17 @@
       }
     },
     hasIndexedDB: function (){
-      return !!window.indexedDB;
+      try {
+        return !!window.indexedDB;
+      } catch(e) {
+        return true; // SecurityError when referencing it means it exists
+      }
+    },
+    getHardwareConcurrency: function(){
+      if(navigator.hardwareConcurrency){
+        return navigator.hardwareConcurrency;
+      }
+      return "unknown";
     },
     getNavigatorCpuClass: function () {
       if(navigator.cpuClass){
@@ -638,6 +662,10 @@
     getDoNotTrack: function () {
       if(navigator.doNotTrack) {
         return navigator.doNotTrack;
+      } else if (navigator.msDoNotTrack) {
+        return navigator.msDoNotTrack;
+      } else if (window.doNotTrack) {
+        return window.doNotTrack;
       } else {
         return "unknown";
       }
@@ -798,6 +826,19 @@
       result.push("webgl stencil bits:" + gl.getParameter(gl.STENCIL_BITS));
       result.push("webgl vendor:" + gl.getParameter(gl.VENDOR));
       result.push("webgl version:" + gl.getParameter(gl.VERSION));
+
+      try {
+        // Add the unmasked vendor and unmasked renderer if the debug_renderer_info extension is available
+        var extensionDebugRendererInfo = gl.getExtension("WEBGL_debug_renderer_info");
+        if (!extensionDebugRendererInfo) {
+          if (typeof NODEBUG === "undefined") {
+            this.log("WebGL fingerprinting is incomplete, because your browser does not have the extension WEBGL_debug_renderer_info");
+          }
+        } else {
+          result.push("webgl unmasked vendor:" + gl.getParameter(extensionDebugRendererInfo.UNMASKED_VENDOR_WEBGL));
+          result.push("webgl unmasked renderer:" + gl.getParameter(extensionDebugRendererInfo.UNMASKED_RENDERER_WEBGL));
+        }
+      } catch(e) { /* squelch */ }
 
       if (!gl.getShaderPrecisionFormat) {
         if (typeof NODEBUG === "undefined") {
@@ -1286,6 +1327,6 @@
       return ("00000000" + (h1[0] >>> 0).toString(16)).slice(-8) + ("00000000" + (h1[1] >>> 0).toString(16)).slice(-8) + ("00000000" + (h2[0] >>> 0).toString(16)).slice(-8) + ("00000000" + (h2[1] >>> 0).toString(16)).slice(-8);
     }
   };
-  Fingerprint2.VERSION = "1.4.1";
+  Fingerprint2.VERSION = "1.5.0";
   return Fingerprint2;
 });
