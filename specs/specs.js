@@ -264,6 +264,20 @@ describe('Fingerprint2', function () {
       })
     })
 
+    describe('measurePerformance option', function () {
+      it('add "time" key on each component', function (done) {
+          var fp2 = new Fingerprint2({
+            measurePerformance: true
+          }); 
+          fp2.get(function (_, components) {
+            if(fp2.isEnumerateDevicesSupported())
+              for(var i=0;i<components.length;i++)
+                expect(components[i].time).not.toBeNull()
+            done()
+          })
+      })
+    })
+
     if (!onPhantomJs) {
       describe('enumerate devices fingerprint', function () {
         it('checks enumerate devices fingerprint', function (done) {
